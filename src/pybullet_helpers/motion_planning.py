@@ -8,11 +8,10 @@ from functools import partial
 from typing import Callable, Collection, Iterable, Iterator, Optional
 
 import numpy as np
-from tomsutils.motion_planning import BiRRT, RRT
-
-from pybullet_helpers.gui import visualize_pose
+from tomsutils.motion_planning import RRT, BiRRT
 
 from pybullet_helpers.geometry import Pose, multiply_poses
+from pybullet_helpers.gui import visualize_pose
 from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     check_collisions_with_held_object,
@@ -26,11 +25,12 @@ from pybullet_helpers.joint import (
     iter_between_joint_positions,
 )
 from pybullet_helpers.math_utils import geometric_sequence
+from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
 from pybullet_helpers.robots.single_arm import (
     SingleArmPyBulletRobot,
     SingleArmTwoFingerGripperPyBulletRobot,
 )
-from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
+
 
 @dataclass(frozen=True)
 class MotionPlanningHyperparameters:
@@ -40,6 +40,7 @@ class MotionPlanningHyperparameters:
     birrt_num_attempts: int = 10
     birrt_num_iters: int = 100
     birrt_smooth_amt: int = 50
+
 
 def try_direct_path(
     robot: SingleArmPyBulletRobot,
@@ -90,6 +91,7 @@ def try_direct_path(
             return None
         path.append(newpt)
     return path
+
 
 def run_motion_planning(
     robot: SingleArmPyBulletRobot,
@@ -179,6 +181,7 @@ def run_motion_planning(
     )
 
     return birrt.query(initial_positions, target_positions)
+
 
 def get_motion_plan_distance(
     motion_plan: list[JointPositions],

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import pybullet as p
+
 from pybullet_helpers.ikfast import IKFastInfo
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots.single_arm import (
@@ -41,7 +42,9 @@ class KinovaGen3NoGripperPyBulletRobot(SingleArmPyBulletRobot):
 
 class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
     """A Kinova Gen3 robot arm with a robotiq gripper.
-    We do not inherit from SingleArmTwoFingerGripperPyBulletRobot because the gripper has mimic joints.
+
+    We do not inherit from SingleArmTwoFingerGripperPyBulletRobot
+    because the gripper has mimic joints.
     """
 
     @classmethod
@@ -52,7 +55,7 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
     def urdf_path(cls) -> Path:
         dir_path = get_assets_path() / "urdf"
         return dir_path / "kortex_description" / "robots" / "gen3_7dof.urdf"
-    
+
     @property
     def default_home_joint_positions(self) -> JointPositions:
         return [-4.3, -1.6, -4.8, -1.8, -1.4, -1.1, 1.6, 0.0]
@@ -84,21 +87,22 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
 
     @cached_property
     def finger_joint_idx(self) -> int:
-        """The index into the joints corresponding to the revolute finger joint.
+        """The index into the joints corresponding to the revolute finger
+        joint.
 
         Note this is not the joint ID, but the index of the joint within
         the list of arm joints.
         """
         return self.arm_joints.index(self.finger_joint_id)
-    
+
     @property
     def open_fingers_joint_value(self) -> float:
-        return 0.0 
+        return 0.0
 
     @property
     def closed_fingers_joint_value(self) -> float:
-        return 0.8 
-    
+        return 0.8
+
     @property
     def tool_grasp_final_joint_value(self) -> float:
         return 0.5
@@ -127,19 +131,29 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
             self.finger_joint_id,
             physicsClientId=self.physics_client_id,
         )[0]
-    
+
     @cached_property
     def positive_mimic_joints(self) -> list[int]:
-        """Mimic joints of gripper that are positive multiplier of finger joint."""
-        positive_mimic_joints = ["right_outer_knuckle_joint", "left_inner_knuckle_joint", "right_inner_knuckle_joint"]
-        return [self.joint_from_name(joint_name) for joint_name in positive_mimic_joints]
-    
+        """Mimic joints of gripper that are positive multiplier of finger
+        joint."""
+        positive_mimic_joints = [
+            "right_outer_knuckle_joint",
+            "left_inner_knuckle_joint",
+            "right_inner_knuckle_joint",
+        ]
+        return [
+            self.joint_from_name(joint_name) for joint_name in positive_mimic_joints
+        ]
+
     @cached_property
     def negative_mimic_joints(self) -> list[int]:
-        """Mimic joints of gripper that are negative multiplier of finger joint."""
+        """Mimic joints of gripper that are negative multiplier of finger
+        joint."""
         negative_mimic_joints = ["left_inner_finger_joint", "right_inner_finger_joint"]
-        return [self.joint_from_name(joint_name) for joint_name in negative_mimic_joints]
-    
+        return [
+            self.joint_from_name(joint_name) for joint_name in negative_mimic_joints
+        ]
+
     def set_joints(self, joint_positions: JointPositions) -> None:
         """Directly set the joint positions.
 
@@ -153,10 +167,18 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
             f"got {len(joint_positions)}"
         )
 
-        arm_joints_with_mimic_joints = self.arm_joints + self.positive_mimic_joints + self.negative_mimic_joints
-        joint_positions_with_mimic_joints = joint_positions + [joint_positions[-1]] * len(self.positive_mimic_joints) + [-joint_positions[-1]] * len(self.negative_mimic_joints)
-        
-        for joint_id, joint_val in zip(arm_joints_with_mimic_joints, joint_positions_with_mimic_joints):
+        arm_joints_with_mimic_joints = (
+            self.arm_joints + self.positive_mimic_joints + self.negative_mimic_joints
+        )
+        joint_positions_with_mimic_joints = (
+            joint_positions
+            + [joint_positions[-1]] * len(self.positive_mimic_joints)
+            + [-joint_positions[-1]] * len(self.negative_mimic_joints)
+        )
+
+        for joint_id, joint_val in zip(
+            arm_joints_with_mimic_joints, joint_positions_with_mimic_joints
+        ):
             p.resetJointState(
                 self.robot_id,
                 joint_id,
@@ -169,8 +191,14 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
         """Update the motors to move toward the given joint positions."""
         assert len(joint_positions) == len(self.arm_joints)
 
-        arm_joints_with_mimic_joints = self.arm_joints + self.positive_mimic_joints + self.negative_mimic_joints
-        joint_positions_with_mimic_joints = joint_positions + [1.0] * len(self.positive_mimic_joints) + [-1.0] * len(self.negative_mimic_joints)
+        arm_joints_with_mimic_joints = (
+            self.arm_joints + self.positive_mimic_joints + self.negative_mimic_joints
+        )
+        joint_positions_with_mimic_joints = (
+            joint_positions
+            + [1.0] * len(self.positive_mimic_joints)
+            + [-1.0] * len(self.negative_mimic_joints)
+        )
 
         # Set arm joint motors.
         if self._control_mode == "position":

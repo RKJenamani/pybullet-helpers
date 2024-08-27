@@ -19,11 +19,11 @@ from pybullet_helpers.ikfast.utils import (
 )
 from pybullet_helpers.joint import JointPositions, get_joint_infos, get_joints
 from pybullet_helpers.link import get_link_pose, get_link_state
+from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
 from pybullet_helpers.robots.single_arm import (
     SingleArmPyBulletRobot,
     SingleArmTwoFingerGripperPyBulletRobot,
 )
-from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
 
 
 class InverseKinematicsError(ValueError):
@@ -419,6 +419,7 @@ def _add_fingers_to_joint_positions(
     joint_positions.insert(first_finger_idx, current_fingers)
     joint_positions.insert(second_finger_idx, current_fingers)
     return joint_positions
+
 
 def _add_finger_to_joint_positions(
     robot: KinovaGen3RobotiqGripperPyBulletRobot, joint_positions: JointPositions
