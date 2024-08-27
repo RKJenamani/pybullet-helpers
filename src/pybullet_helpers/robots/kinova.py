@@ -222,6 +222,6 @@ class KinovaGen3RobotiqGripperPyBulletRobot(SingleArmPyBulletRobot):
             module_dir="kortex",
             module_name="ikfast_kortex",
             base_link="base_link",
-            ee_link="tool_frame",
+            ee_link="end_effector_link",
             free_joints=["joint_7"],
         )
