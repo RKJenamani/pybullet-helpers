@@ -8,7 +8,9 @@ from functools import partial
 from typing import Callable, Collection, Iterable, Iterator, Optional
 
 import numpy as np
-from tomsutils.motion_planning import BiRRT
+from tomsutils.motion_planning import BiRRT, RRT
+
+from pybullet_helpers.gui import visualize_pose
 
 from pybullet_helpers.geometry import Pose, multiply_poses
 from pybullet_helpers.inverse_kinematics import (
@@ -28,7 +30,7 @@ from pybullet_helpers.robots.single_arm import (
     SingleArmPyBulletRobot,
     SingleArmTwoFingerGripperPyBulletRobot,
 )
-
+from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
 
 @dataclass(frozen=True)
 class MotionPlanningHyperparameters:
@@ -39,6 +41,55 @@ class MotionPlanningHyperparameters:
     birrt_num_iters: int = 100
     birrt_smooth_amt: int = 50
 
+def try_direct_path(
+    robot: SingleArmPyBulletRobot,
+    initial_positions: JointPositions,
+    target_positions: JointPositions,
+    collision_bodies: Collection[int],
+    physics_client_id: int,
+    held_object: int | None = None,
+    base_link_to_held_obj: Pose | None = None,
+    hyperparameters: MotionPlanningHyperparameters | None = None,
+    additional_state_constraint_fn: Callable[[JointPositions], bool] | None = None,
+) -> Optional[list[JointPositions]]:
+    """Check if there is a direct path between two joint positions."""
+
+    if hyperparameters is None:
+        hyperparameters = MotionPlanningHyperparameters()
+
+    joint_infos = get_joint_infos(robot.robot_id, robot.arm_joints, physics_client_id)
+    num_interp = hyperparameters.birrt_extend_num_interp
+
+    _collision_fn: Callable[[JointPositions], bool] = partial(
+        check_collisions_with_held_object,
+        robot,
+        collision_bodies,
+        physics_client_id,
+        held_object,
+        base_link_to_held_obj,
+    )
+    if additional_state_constraint_fn is not None:
+        _initial_collision_fn = _collision_fn
+        _collision_fn = lambda x: _initial_collision_fn(
+            x
+        ) or not additional_state_constraint_fn(x)
+
+    def _extend_fn(
+        pt1: JointPositions, pt2: JointPositions
+    ) -> Iterator[JointPositions]:
+        yield from iter_between_joint_positions(
+            joint_infos, pt1, pt2, num_interp_per_unit=num_interp, include_start=False
+        )
+
+    if _collision_fn(initial_positions) or _collision_fn(target_positions):
+        return None
+
+    path = [initial_positions]
+    for newpt in _extend_fn(initial_positions, target_positions):
+        if _collision_fn(newpt):
+            return None
+        path.append(newpt)
+    return path
 
 def run_motion_planning(
     robot: SingleArmPyBulletRobot,
@@ -101,6 +152,9 @@ def run_motion_planning(
         if isinstance(robot, SingleArmTwoFingerGripperPyBulletRobot):
             new_pt[robot.left_finger_joint_idx] = pt[robot.left_finger_joint_idx]
             new_pt[robot.right_finger_joint_idx] = pt[robot.right_finger_joint_idx]
+
+        if isinstance(robot, KinovaGen3RobotiqGripperPyBulletRobot):
+            new_pt[robot.finger_joint_idx] = pt[robot.finger_joint_idx]
         return new_pt
 
     if sampling_fn is None:
@@ -125,7 +179,6 @@ def run_motion_planning(
     )
 
     return birrt.query(initial_positions, target_positions)
-
 
 def get_motion_plan_distance(
     motion_plan: list[JointPositions],
@@ -207,7 +260,7 @@ def run_smooth_motion_planning_to_pose(
         target_pose = target_pose_sampler()
         # Transform to end effector space.
         end_effector_pose = multiply_poses(
-            target_pose, plan_frame_from_end_effector_frame
+            target_pose, plan_frame_from_end_effector_frame.invert()
         )
         # Sample a collision-free joint target. If none exist, we'll just
         # go back to sampling a different target pose.

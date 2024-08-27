@@ -23,6 +23,7 @@ from pybullet_helpers.robots.single_arm import (
     SingleArmPyBulletRobot,
     SingleArmTwoFingerGripperPyBulletRobot,
 )
+from pybullet_helpers.robots.kinova import KinovaGen3RobotiqGripperPyBulletRobot
 
 
 class InverseKinematicsError(ValueError):
@@ -81,6 +82,9 @@ def inverse_kinematics(
         # IKFast doesn't handle fingers, so we add them afterwards.
         if isinstance(robot, SingleArmTwoFingerGripperPyBulletRobot):
             joint_positions = _add_fingers_to_joint_positions(robot, joint_positions)
+
+        if isinstance(robot, KinovaGen3RobotiqGripperPyBulletRobot):
+            joint_positions = _add_finger_to_joint_positions(robot, joint_positions)
 
         if validate:
             try:
@@ -225,6 +229,10 @@ def sample_collision_free_inverse_kinematics(
     if isinstance(robot, SingleArmTwoFingerGripperPyBulletRobot):
         add_fingers = partial(_add_fingers_to_joint_positions, robot)
         generator = map(add_fingers, generator)
+
+    if isinstance(robot, KinovaGen3RobotiqGripperPyBulletRobot):
+        add_finger = partial(_add_finger_to_joint_positions, robot)
+        generator = map(add_finger, generator)
 
     yield from filter_collision_free_joint_generator(
         generator,
@@ -410,4 +418,11 @@ def _add_fingers_to_joint_positions(
     current_fingers = robot.get_finger_state()
     joint_positions.insert(first_finger_idx, current_fingers)
     joint_positions.insert(second_finger_idx, current_fingers)
+    return joint_positions
+
+def _add_finger_to_joint_positions(
+    robot: KinovaGen3RobotiqGripperPyBulletRobot, joint_positions: JointPositions
+) -> JointPositions:
+    current_fingers = robot.get_finger_state()
+    joint_positions.insert(robot.finger_joint_idx, current_fingers)
     return joint_positions
